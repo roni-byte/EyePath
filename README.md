@@ -70,6 +70,40 @@ npm run format:fix
 npm run lint:fix
 ```
 
+### code coverage (jacoco)
+
+wyniki w folderze: pzsp2-eyetracking/backend/target/site/jacoco/index.html
+
+można je czytelniej zobaczyć przez przeglądarke wpisując:
+
+```
+file:///home/<sciezka do repo>/pzsp2-eyetracking/backend/target/site/jacoco/index.html
+```
+
+### check code quality (SonarQube)
+
+- po docker-compose up -d trzeba chwilę poczekać
+- wchodzimy na stronę
+
+```
+http://localhost:9000
+```
+
+- tam powinna pojawić się strona SonarQube
+- trzeba się zalogować (jeśli pierwszy raz to l: admin, h: admin)
+- Projects -> local -> Follows the instance default -> Analysis Method Locally -> generate token -> maven
+
+komendy do terminala (przykład, najlepiej skopiować kod z SonarQube):
+
+```
+cd backend
+mvn clean verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
+  -Dsonar.projectKey=pzsp2-backend \
+  -Dsonar.projectName='pzsp2-backend' \
+  -Dsonar.host.url=http://localhost:9000 \
+  -Dsonar.token=<sqp..>
+```
+
 ## Główne Funkcjonalności
 
 - Utworzenie badania
@@ -79,4 +113,3 @@ npm run lint:fix
 - Przeglądanie badań
 - Przeglądanie wyników z danego badania
 - Pobranie wyników badań w formacie csv
-
