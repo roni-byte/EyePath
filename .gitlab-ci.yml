@@ -1,0 +1,162 @@
+# =======================================
+# GitLab CI/CD pipeline for full-stack app
+# Backend: Java 21 + Maven
+# Frontend: React + Node.js 20
+# =======================================
+
+stages:
+  - lint
+  - build
+  - test
+  - package
+  - deploy
+
+# Global variables
+variables:
+  MAVEN_CLI_OPTS: "--batch-mode -Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository"
+  MAVEN_USER_HOME: "$CI_PROJECT_DIR/.m2"
+
+# =====================
+# BACKEND LINT
+# =====================
+
+lint_backend:
+  stage: lint
+  image: maven:3.9.9-eclipse-temurin-21
+  cache:
+    key: mvn-cache
+    paths:
+      - .m2/repository
+    policy: pull-push
+  script:
+    - echo "Linting backend..."
+    - cd backend
+    - mkdir -p $MAVEN_USER_HOME/repository
+    - mvn $MAVEN_CLI_OPTS checkstyle:check
+
+# =====================
+# FRONTEND LINT
+# =====================
+
+lint_frontend:
+  stage: lint
+  image: node:20
+  variables:
+    NODE_ENV: development
+  cache:
+    key: node-modules
+    paths:
+      - frontend/node_modules/
+    policy: pull-push
+  script:
+    - echo "Linting and checking format for frontend..."
+    - cd frontend
+    - npm ci --legacy-peer-deps
+    - npm run lint
+    - npm run format:check
+
+# =====================
+# BACKEND BUILD
+# =====================
+build_backend:
+  stage: build
+  image: maven:3.9.9-eclipse-temurin-21
+  cache:
+    key: mvn-cache
+    paths:
+      - .m2/repository
+    policy: pull-push
+  script:
+    - echo "🚧 Building backend..."
+    - cd backend
+    - mkdir -p $MAVEN_USER_HOME/repository
+    - mvn $MAVEN_CLI_OPTS clean package -DskipTests
+  artifacts:
+    paths:
+      - backend/target/*.jar
+    expire_in: 1 week
+  needs: ["lint_backend"]
+
+# =====================
+# FRONTEND BUILD
+# =====================
+build_frontend:
+  stage: build
+  image: node:20
+  variables:
+    NODE_ENV: production
+    DISABLE_ESLINT_PLUGIN: "true"
+  cache:
+    key: node-modules
+    paths:
+      - frontend/node_modules/
+    policy: pull-push
+  script:
+    - echo "🚧 Building frontend..."
+    - cd frontend
+    - npm ci --legacy-peer-deps
+    - npm run build
+  artifacts:
+    paths:
+      - frontend/build/
+    expire_in: 1 week
+  needs: ["lint_frontend"]
+
+# =====================
+# BACKEND TESTS
+# =====================
+test_backend:
+  stage: test
+  image: maven:3.9.9-eclipse-temurin-21
+  cache:
+    key: mvn-cache
+    paths:
+      - .m2/repository
+    policy: pull-push
+  script:
+    - echo "🧪 Running backend tests..."
+    - cd backend
+    - mvn $MAVEN_CLI_OPTS test
+  needs: ["build_backend"]
+
+# =====================
+# FRONTEND TESTS
+# =====================
+test_frontend:
+  stage: test
+  image: node:20
+  cache:
+    key: node-modules
+    paths:
+      - frontend/node_modules/
+    policy: pull-push
+  variables:
+    NODE_ENV: development
+  script:
+    - echo "🧪 Running frontend tests..."
+    - cd frontend
+    - npm ci --legacy-peer-deps
+    - npm test -- --watchAll=false
+  needs: ["build_frontend"]
+
+# =====================
+# PACKAGE & DEPLOY
+# =====================
+deploy:
+  stage: deploy
+  image: alpine:latest
+  script:
+    - echo "🚀 Packaging build artifacts..."
+    - mkdir -p deploy/
+    - mv backend/target/*.jar deploy/backend.jar
+    - mv frontend/build deploy/frontend/
+    - echo "✅ Deployment package ready"
+  artifacts:
+    paths:
+      - deploy/
+    expire_in: 2 weeks
+  only:
+    - main
+  needs:
+    - build_backend
+    - build_frontend
